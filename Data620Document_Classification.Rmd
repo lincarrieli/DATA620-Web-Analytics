@@ -1,0 +1,153 @@
+---
+title: "Data 620 Document Classification"
+author: "Tony Mei and Lin Li"
+date: "4/22/2021"
+output:
+  html_document
+urlcolor: purple
+---
+
+# Overview 
+
+In this project, we will be analyzing a corpus of labeled spam and ham (non-spam) e-mails to predict whether or not a new document is spam.  Here is one example of such data:  http://archive.ics.uci.edu/ml/datasets/Spambase
+
+```{r}
+library(caret)
+library(MASS)
+library(pROC)
+
+```
+
+```{r}
+
+spam_df <- read.csv("spambase.data.txt", header = FALSE)
+head(spam_df)
+```
+
+
+```{r}
+colnames(spam_df) <-  c("word_freq_make", "word_freq_address", "word_freq_all", "word_freq_3d",     "word_freq_our", "word_freq_over", "word_freq_remove", "word_freq_internet", 
+    "word_freq_order", "word_freq_mail", "word_freq_receive", "word_freq_will", 
+    "word_freq_people", "word_freq_report", "word_freq_addresses", "word_freq_free", 
+    "word_freq_business", "word_freq_email", "word_freq_you", "word_freq_credit", 
+    "word_freq_your", "word_freq_font", "word_freq_000", "word_freq_money", 
+    "word_freq_hp", "word_freq_hpl", "word_freq_george", "word_freq_650", "word_freq_lab", 
+    "word_freq_labs", "word_freq_telnet", "word_freq_857", "word_freq_data", 
+    "word_freq_415", "word_freq_85", "word_freq_technology", "word_freq_1999", 
+    "word_freq_parts", "word_freq_pm", "word_freq_direct", "word_freq_cs", "word_freq_meeting", "word_freq_original", "word_freq_project", "word_freq_re", "word_freq_edu", "word_freq_table", "word_freq_conference", "char_freq_ch;", "char_freq_ch(", 
+    "char_freq_ch[", "char_freq_ch!", "char_freq_ch$", "char_freq_ch#", "capital_run_length_average", "capital_run_length_longest", "capital_run_length_total", "spam")
+head(spam_df)
+
+```
+
+
+```{r}
+
+barplot(table(spam_df$spam),main="Spam vs Non Spam")
+
+```
+
+Split into training and test set
+
+```{r}
+# Set seed value
+set.seed(525)
+# Shuffle the data set in R
+spam_df <- spam_df[sample(nrow(spam_df)),]
+#converst spam to factor
+
+spam_df$spam <- as.factor(spam_df$spam)
+index <- createDataPartition(spam_df$spam, p = 0.70,list = FALSE)
+train_set <- spam_df[index,]
+test_set <- spam_df[-index,]
+```
+
+# Build model on Training Data
+
+```{r}
+# Control parameters for model
+train_ctrl <- trainControl(method = "repeatedcv",number = 10, repeats = 10)
+
+```
+
+# Support Vector Machine
+
+The objective of the support vector machine algorithm is to find a hyperplane in an N-dimensional space (N — the number of features) that distinctly classifies the data points. To separate the two classes of data points, there are many possible hyperplanes that could be chosen. Our objective is to find a plane that has the maximum margin, i.e the maximum distance between data points of both classes. Maximizing the margin distance provides some reinforcement so that future data points can be classified with more confidence.
+
+
+```{r}
+# prediction
+
+model_svm <- train(spam~., data = train_set, method = "svmLinear",trControl = train_ctrl)
+
+pred_svm <- predict(model_svm, test_set[,-58])
+
+confusionMatrix(pred_svm,test_set$spam)
+
+```
+# Linear Discriminant Analysis
+
+Linear Discriminant Analysis takes a data set of cases (also known as observations) as input. For each case, you need to have a categorical variable to define the class and several predictor variables (which are numeric). We often visualize this input data as a matrix, such as shown below, with each case being a row and each variable a column. In this example, the categorical variable is called "class" and the predictive variables (which are numeric) are the other columns.
+
+```{r}
+# "LDA confusion matrix"
+
+model_lda <- train(spam~., data = train_set, method = "lda",trControl = train_ctrl)
+
+pred_lda <- predict(model_lda, test_set[, -58])
+
+confusionMatrix(pred_lda,test_set$spam)
+
+
+```
+
+# K Nearest Neighbour
+
+```{r}
+# knn classification
+
+model_knn <- train(spam~., data = train_set, method = "knn",trControl = train_ctrl)
+
+pred_knn <- predict(model_knn, test_set[,-58])
+
+confusionMatrix(pred_knn,test_set$spam)
+```
+
+```{r}
+# calculate roc curve values
+roc_svm <- roc(pred_svm,as.numeric(test_set$spam))
+roc_lda <- roc(as.numeric(pred_lda),as.numeric(test_set$spam))
+roc_knn <- roc(as.numeric(pred_knn), as.numeric(test_set$spam))
+
+# Area under the curve
+roc_svm$auc
+
+```
+
+```{r}
+roc_lda$auc
+```
+
+```{r}
+roc_knn$auc
+```
+
+```{r}
+plot(roc_svm,col="red",lty=1,main="ROC curve for the three models")
+plot(roc_lda,col="green",lty=2,add=TRUE)
+plot(roc_knn,col="blue",lty=3,add=TRUE) 
+legend("topright", legend=c("SVM","LDA","KNN"), col = c("red","green","blue"), lty=1:3)
+
+```
+
+# Conclusion
+
+SVM is the better mode with area under the curve: 0.9408. 
+
+# Works Cited:
+
+Jake Hoare. Linear Discriminant Analysis in R: An Introduction. https://www.displayr.com/linear-discriminant-analysis-in-r-an-introduction/
+
+Dhilip Subramanian. (2019, Jun 8).  A Simple Introduction to K-Nearest Neighbors Algorithm. https://towardsdatascience.com/a-simple-introduction-to-k-nearest-neighbors-algorithm-b3519ed98e
+
+Rohith Gandhi. (2018, Jun 7). Support Vector Machine — Introduction to Machine Learning Algorithms. https://towardsdatascience.com/support-vector-machine-introduction-to-machine-learning-algorithms-934a444fca47
